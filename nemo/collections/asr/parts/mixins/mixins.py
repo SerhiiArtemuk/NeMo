@@ -647,7 +647,7 @@ class ASRModuleMixin(ASRAdapterModelMixin):
                 decoder = self.decoder
 
             log_probs = decoder(encoder_output=encoded)
-            predictions_tensor = log_probs.argmax(dim=-1, keepdim=False)
+            predictions_tensor = log_probs # .argmax(dim=-1, keepdim=False)
 
             # Concatenate the previous predictions with the current one to have the full predictions.
             # We drop the extra predictions for each sample by using the lengths returned by the encoder (encoded_len)
@@ -661,9 +661,9 @@ class ASRModuleMixin(ASRAdapterModelMixin):
                 if encoded_len is None:
                     preds_cur = predictions_tensor[preds_idx]
                 else:
-                    preds_cur = predictions_tensor[preds_idx, : encoded_len[preds_idx]]
+                    preds_cur = predictions_tensor[preds_idx, : encoded_len[preds_idx], :]
                 if previous_pred_out is not None:
-                    greedy_predictions_concat = torch.cat((previous_pred_out[preds_idx], preds_cur), dim=-1)
+                    greedy_predictions_concat = torch.cat((previous_pred_out[preds_idx], preds_cur), dim=-2)
                     encoded_len[preds_idx] += len(previous_pred_out[preds_idx])
                 else:
                     greedy_predictions_concat = preds_cur
