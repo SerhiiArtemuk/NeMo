@@ -130,17 +130,21 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
         super().__init__()
         print(f'Init time takes {time.time() - init_part_time} sec')
 
+        init_1_time = time.time()
         self.criterion_type = CriterionType.CTC
         self.tokenizer_wrapper = _TokensWrapper(vocabulary, tokenizer)
         self.vocab_size = self.tokenizer_wrapper.vocab_size
         self.blank = self.tokenizer_wrapper.blank
         self.silence = self.tokenizer_wrapper.unk_id
+        print(f'Init 1 takes {time.time() - init_1_time}')
 
         if lexicon_path is not None:
+            load_time = time.time()
             lexicon_init_time = time.time()
             self.lexicon = load_words(lexicon_path)
             self.word_dict = create_word_dict(self.lexicon)
             self.unk_word = self.word_dict.get_index("<unk>")
+            print(f'load time takes {time.time() - load_time} sec')
 
             # loads in the boosted words if given via a file
             boost_cycle_1_time = time.time()
