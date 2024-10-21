@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import time
 import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
@@ -510,6 +511,7 @@ class BeamCTCInfer(AbstractBeamCTCInfer):
             # Must import at runtime to avoid circular dependency due to module level import.
             from nemo.collections.asr.modules.flashlight_decoder import FlashLightKenLMBeamSearchDecoder
 
+            ken_lm_time = time.time()
             self.flashlight_beam_scorer = FlashLightKenLMBeamSearchDecoder(
                 lm_path=self.kenlm_path,
                 vocabulary=self.vocab,
@@ -524,14 +526,17 @@ class BeamCTCInfer(AbstractBeamCTCInfer):
                 unk_weight=self.flashlight_cfg.unk_weight,
                 sil_weight=self.flashlight_cfg.sil_weight,
             )
+            logging.ingo(f'Ken lm init takes {time.time() - ken_lm_time} sec')
 
         x = x.to('cpu')
 
         with typecheck.disable_checks():
+            flashlight_forward_time = time.time()
             beams_batch = self.flashlight_beam_scorer.forward(log_probs=x)
-
+            logging.info(f'Flashlight forward takes {time.time() - flashlight_forward_time} sec')
         # For each sample in the batch
         nbest_hypotheses = []
+        beam_post_proc_time = time.time()
         for beams_idx, beams in enumerate(beams_batch):
             # For each beam candidate / hypothesis in each sample
             hypotheses = []
@@ -556,7 +561,7 @@ class BeamCTCInfer(AbstractBeamCTCInfer):
             # Wrap the result in NBestHypothesis.
             hypotheses = rnnt_utils.NBestHypotheses(hypotheses)
             nbest_hypotheses.append(hypotheses)
-
+        logging.info(f'Beam post proc takes {time.time() - beam_post_proc_time} sec')
         return nbest_hypotheses
 
     def set_decoding_type(self, decoding_type: str):

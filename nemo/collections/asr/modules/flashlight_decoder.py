@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import itertools
+import time
 import math
 from typing import Iterable, List, Optional, Tuple, Union
 
@@ -273,8 +274,9 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             # which is what we obtain here. Then we pass it to pybinding method which
             # is bound to the underlying C++ code
             emissions_ptr = emissions.data_ptr() + 4 * b * emissions.stride(0)
+            emission_decode_time = time.time()
             results = self.decoder.decode(emissions_ptr, T, N)
-
+            print(f'Emmision decode takes {time.time() - emission_decode_time} sec')
             hypos.append(
                 [
                     {

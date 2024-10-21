@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import time
 from abc import abstractmethod
 from dataclasses import dataclass, field, is_dataclass
 from typing import Callable, Dict, List, Optional, Tuple, Union
@@ -366,10 +367,11 @@ class AbstractCTCDecoding(ConfidenceMixin):
 
         with torch.inference_mode():
             # Resolve the forward step of the decoding strategy
+            decoding_time = time.time()
             hypotheses_list = self.decoding(
                 decoder_output=decoder_outputs, decoder_lengths=decoder_lengths
             )  # type: List[List[Hypothesis]]
-
+            logging.info(f'Decoding takes {time.time() - decoding_time} seconds')
             # extract the hypotheses
             hypotheses_list = hypotheses_list[0]  # type: List[Hypothesis]
 
@@ -378,11 +380,12 @@ class AbstractCTCDecoding(ConfidenceMixin):
             all_hypotheses = []
 
             for nbest_hyp in hypotheses_list:  # type: NBestHypotheses
+                decode_hyp_time = time.time()
                 n_hyps = nbest_hyp.n_best_hypotheses  # Extract all hypotheses for this sample
                 decoded_hyps = self.decode_hypothesis(
                     n_hyps, fold_consecutive
                 )  # type: List[Union[Hypothesis, NBestHypotheses]]
-
+                logging.info(f'Decode hyp takes (NBEST) {time.time() - decode_hyp_time} sec')
                 # If computing timestamps
                 if self.compute_timestamps is True:
                     timestamp_type = self.cfg.get('ctc_timestamp_type', 'all')
@@ -400,10 +403,11 @@ class AbstractCTCDecoding(ConfidenceMixin):
             return best_hyp_text, all_hyp_text
 
         else:
+            decode_hyp_time = time.time()
             hypotheses = self.decode_hypothesis(
                 hypotheses_list, fold_consecutive
             )  # type: List[Union[Hypothesis, NBestHypotheses]]
-
+            logging.info(f'Decode hyp takes (not NBEST) {time.time() - decode_hyp_time} sec')
             # If computing timestamps
             if self.compute_timestamps is True:
                 # greedy decoding, can get high-level confidence scores
