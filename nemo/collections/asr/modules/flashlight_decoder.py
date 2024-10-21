@@ -109,7 +109,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
         unk_weight: float = -math.inf,
         sil_weight: float = 0.0,
     ):
-
+        init_part_time = time.time()
         try:
             from flashlight.lib.text.decoder import (
                 LM,
@@ -128,6 +128,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             )
 
         super().__init__()
+        print(f'Init time takes {time.time() - init_part_time} sec')
 
         self.criterion_type = CriterionType.CTC
         self.tokenizer_wrapper = _TokensWrapper(vocabulary, tokenizer)
@@ -136,11 +137,13 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
         self.silence = self.tokenizer_wrapper.unk_id
 
         if lexicon_path is not None:
+            lexicon_init_time = time.time()
             self.lexicon = load_words(lexicon_path)
             self.word_dict = create_word_dict(self.lexicon)
             self.unk_word = self.word_dict.get_index("<unk>")
 
             # loads in the boosted words if given via a file
+            boost_cycle_1_time = time.time()
             if boost_path is not None:
                 with open(boost_path, 'r', encoding='utf_8') as fr:
                     boost_words = [line.strip().split('\t') for line in fr]
@@ -152,7 +155,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             for word in boost_words.keys():
                 if word not in self.lexicon:
                     self.word_dict.add_entry(word)
-
+            print(f'boost_cycle_1_time {time.time() - boost_cycle_1_time}')
             # loads in the kenlm binary and combines in with the dictionary object from the lexicon
             # this gives a mapping between each entry in the kenlm binary and its mapping to whatever
             # numeraire is used by the AM, which is explicitly mapped via the lexicon
@@ -161,6 +164,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             self.trie = Trie(self.vocab_size, self.silence)
 
             start_state = self.lm.start(False)
+            boost_cycle_2_time = time.time()
             for i, (word, spellings) in enumerate(self.lexicon.items()):
                 word_idx = self.word_dict.get_index(word)
                 _, score = self.lm.score(start_state, word_idx)
@@ -172,7 +176,9 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                     self.trie.insert(
                         spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
                     )
+            print(f'boost_cycle_2_time {time.time() - boost_cycle_2_time}')
             # handle OOV boosted words
+            boost_cycle_3_time = time.time()
             for word, boost in boost_words.items():
                 if word not in self.lexicon:
                     word_idx = self.word_dict.get_index(word)
@@ -182,7 +188,10 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                         print(f'tokenizer has unknown id for word[ {word} ] {spelling} {spelling_idxs}', flush=True)
                         continue
                     self.trie.insert(spelling_idxs, word_idx, float(boost))
+            print(f'boost_cycle_3_time {time.time() - boost_cycle_3_time}')
+            post_init_time = time.time()
             self.trie.smear(SmearingMode.MAX)
+
 
             self.decoder_opts = LexiconDecoderOptions(
                 beam_size=beam_size,
@@ -199,6 +208,8 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             self.decoder = LexiconDecoder(
                 self.decoder_opts, self.trie, self.lm, self.silence, self.blank, self.unk_word, [], False,
             )
+            print(f'Post init takes {time.time() - post_init_time}')
+            print(f'Lexicon init time takes {time.time() - lexicon_init_time}')
         else:
             from flashlight.lib.text.decoder import LexiconFreeDecoder, LexiconFreeDecoderOptions
 
