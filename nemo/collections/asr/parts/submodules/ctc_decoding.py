@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import time
 from abc import abstractmethod
 from dataclasses import dataclass, field, is_dataclass
 from typing import Callable, Dict, List, Optional, Tuple, Union
@@ -316,17 +317,18 @@ class AbstractCTCDecoding(ConfidenceMixin):
 
         with torch.inference_mode():
             # Resolve the forward step of the decoding strategy
+            decoding_time = time.time()
             hypotheses_list = self.decoding(
                 decoder_output=decoder_outputs, decoder_lengths=decoder_lengths
             )  # type: List[List[Hypothesis]]
-
+            logging.info(f'Decoding takes {__name__} {time.time() - decoding_time} seconds')
             # extract the hypotheses
             hypotheses_list = hypotheses_list[0]  # type: List[Hypothesis]
 
         if isinstance(hypotheses_list[0], NBestHypotheses):
             hypotheses = []
             all_hypotheses = []
-
+            nbest_postprocessing_time = time.time()
             for nbest_hyp in hypotheses_list:  # type: NBestHypotheses
                 n_hyps = nbest_hyp.n_best_hypotheses  # Extract all hypotheses for this sample
                 decoded_hyps = self.decode_hypothesis(
@@ -347,13 +349,15 @@ class AbstractCTCDecoding(ConfidenceMixin):
 
             best_hyp_text = [h.text for h in hypotheses]
             all_hyp_text = [h.text for hh in all_hypotheses for h in hh]
+            logging.info(f'nbest_postprocessing_time {__name__} {time.time() - nbest_postprocessing_time}')
             return best_hyp_text, all_hyp_text
 
         else:
+            alternative_postprocessing_time = time.time()
             hypotheses = self.decode_hypothesis(
                 hypotheses_list, fold_consecutive
             )  # type: List[Union[Hypothesis, NBestHypotheses]]
-
+            logging.info(f'Alternative postprocessing takes {time.time() - alternative_postprocessing_time}')
             # If computing timestamps
             if self.compute_timestamps is True:
                 # greedy decoding, can get high-level confidence scores
