@@ -142,9 +142,13 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             load_time = time.time()
             lexicon_init_time = time.time()
             self.lexicon = load_words(lexicon_path)
-            self.word_dict = create_word_dict(self.lexicon)
-            self.unk_word = self.word_dict.get_index("<unk>")
             print(f'load time takes {time.time() - load_time} sec')
+            dict_create_time = time.time()
+            self.word_dict = create_word_dict(self.lexicon)
+            print(f'Dict create time {time.time() - dict_create_time}')
+            get_index_time = time.time()
+            self.unk_word = self.word_dict.get_index("<unk>")
+            print(f'Dict get index time {time.time() - get_index_time}')
 
             # loads in the boosted words if given via a file
             boost_cycle_1_time = time.time()
@@ -169,9 +173,11 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
 
             start_state = self.lm.start(False)
             boost_cycle_2_time = time.time()
+            spelling_loop_time_list = []
             for i, (word, spellings) in enumerate(self.lexicon.items()):
                 word_idx = self.word_dict.get_index(word)
                 _, score = self.lm.score(start_state, word_idx)
+                spelling_loop_time = time.time()
                 for spelling in spellings:
                     spelling_idxs = [self.tokenizer_wrapper.token_to_id(token) for token in spelling]
                     if self.tokenizer_wrapper.unk_id in spelling_idxs:
@@ -180,6 +186,8 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                     self.trie.insert(
                         spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
                     )
+                spelling_loop_time_list.append(time.time() - spelling_loop_time)
+            print(f'Spelling loop takes {sum(spelling_loop_time_list)}')
             print(f'boost_cycle_2_time {time.time() - boost_cycle_2_time}')
             # handle OOV boosted words
             boost_cycle_3_time = time.time()
