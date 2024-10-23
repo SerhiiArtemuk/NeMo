@@ -180,6 +180,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             boost_cycle_2_time = time.time()
             spelling_loop_time_list = []
             score_time_list = []
+            lexicon_loop_time = time.time()
             for i, (word, spellings) in enumerate(self.lexicon.items()):
                 word_idx = self.word_dict.get_index(word)
                 score_time = time.time()
@@ -195,6 +196,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                         spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
                     )
                 spelling_loop_time_list.append(time.time() - spelling_loop_time)
+            print(f'Lexicon loop takes {time.time() - lexicon_loop_time - sum(spelling_loop_time_list)}')
             print(f'Score time takes {sum(score_time_list)}')
             print(f'Spelling loop takes {sum(spelling_loop_time_list)}')
             print(f'boost_cycle_2_time {time.time() - boost_cycle_2_time}')
