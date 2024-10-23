@@ -141,10 +141,10 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
         if lexicon_path is not None:
             load_time = time.time()
             lexicon_init_time = time.time()
-            self.lexicon = load_words(lexicon_path)
+            self.lexicon = load_words(lexicon_path) # TODO speed up
             print(f'load time takes {time.time() - load_time} sec')
             dict_create_time = time.time()
-            self.word_dict = create_word_dict(self.lexicon)
+            self.word_dict = create_word_dict(self.lexicon) # TODO speed up
             print(f'Dict create time {time.time() - dict_create_time}')
             get_index_time = time.time()
             self.unk_word = self.word_dict.get_index("<unk>")
@@ -169,7 +169,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             # numeraire is used by the AM, which is explicitly mapped via the lexicon
             # this information is ued to build a vocabulary trie for decoding
             ken_init_time = time.time()
-            self.lm = KenLM(lm_path, self.word_dict)
+            self.lm = KenLM(lm_path, self.word_dict) # TODO Speed up
             print(f'Ken init time {time.time() - ken_init_time}')
             trie_init_time = time.time()
             self.trie = Trie(self.vocab_size, self.silence)
@@ -181,6 +181,8 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             spelling_loop_time_list = []
             score_time_list = []
             lexicon_loop_time = time.time()
+
+            # TODO Speed up cycle
             for i, (word, spellings) in enumerate(self.lexicon.items()):
                 word_idx = self.word_dict.get_index(word)
                 score_time = time.time()
@@ -213,8 +215,12 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                     self.trie.insert(spelling_idxs, word_idx, float(boost))
             print(f'boost_cycle_3_time {time.time() - boost_cycle_3_time}')
             post_init_time = time.time()
-            self.trie.smear(SmearingMode.MAX)
 
+            # TODO speed up post init
+            post_init_time_1_step = time.time()
+            self.trie.smear(SmearingMode.MAX)
+            print(f'Post init 1 step takes {time.time() - post_init_time_1_step}')
+            post_init_time_2_step = time.time()
             self.decoder_opts = LexiconDecoderOptions(
                 beam_size=beam_size,
                 beam_size_token=int(beam_size_token),
@@ -226,10 +232,12 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                 log_add=False,
                 criterion_type=self.criterion_type,
             )
-
+            print(f'Post init 2 step takes {time.time() - post_init_time_2_step}')
+            post_init_time_3_step = time.time()
             self.decoder = LexiconDecoder(
                 self.decoder_opts, self.trie, self.lm, self.silence, self.blank, self.unk_word, [], False,
             )
+            print(f'Post init 3 step takes {time.time() - post_init_time_3_step}')
             print(f'Post init takes {time.time() - post_init_time}')
             print(f'Lexicon init time takes {time.time() - lexicon_init_time}')
         else:
