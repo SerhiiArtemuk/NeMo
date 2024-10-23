@@ -168,15 +168,23 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             # this gives a mapping between each entry in the kenlm binary and its mapping to whatever
             # numeraire is used by the AM, which is explicitly mapped via the lexicon
             # this information is ued to build a vocabulary trie for decoding
+            ken_init_time = time.time()
             self.lm = KenLM(lm_path, self.word_dict)
+            print(f'Ken init time {time.time() - ken_init_time}')
+            trie_init_time = time.time()
             self.trie = Trie(self.vocab_size, self.silence)
-
+            print(f'Trie init time {time.time() - trie_init_time}')
+            lm_start_time = time.time()
             start_state = self.lm.start(False)
+            print(f'Lm start time {time.time() - lm_start_time}')
             boost_cycle_2_time = time.time()
             spelling_loop_time_list = []
+            score_time_list = []
             for i, (word, spellings) in enumerate(self.lexicon.items()):
                 word_idx = self.word_dict.get_index(word)
+                score_time = time.time()
                 _, score = self.lm.score(start_state, word_idx)
+                score_time_list.append(time.time() - score_time)
                 spelling_loop_time = time.time()
                 for spelling in spellings:
                     spelling_idxs = [self.tokenizer_wrapper.token_to_id(token) for token in spelling]
@@ -187,6 +195,7 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
                         spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
                     )
                 spelling_loop_time_list.append(time.time() - spelling_loop_time)
+            print(f'Score time takes {sum(score_time_list)}')
             print(f'Spelling loop takes {sum(spelling_loop_time_list)}')
             print(f'boost_cycle_2_time {time.time() - boost_cycle_2_time}')
             # handle OOV boosted words
@@ -203,7 +212,6 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             print(f'boost_cycle_3_time {time.time() - boost_cycle_3_time}')
             post_init_time = time.time()
             self.trie.smear(SmearingMode.MAX)
-
 
             self.decoder_opts = LexiconDecoderOptions(
                 beam_size=beam_size,
