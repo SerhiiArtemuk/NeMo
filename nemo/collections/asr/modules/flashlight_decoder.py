@@ -183,46 +183,21 @@ class FlashLightKenLMBeamSearchDecoder(NeuralModule):
             lexicon_loop_time = time.time()
 
             # TODO Speed up cycle
-            # for i, (word, spellings) in enumerate(self.lexicon.items()):
-            #     word_idx = self.word_dict.get_index(word)
-            #     score_time = time.time()
-            #     _, score = self.lm.score(start_state, word_idx)
-            #     score_time_list.append(time.time() - score_time)
-            #     spelling_loop_time = time.time()
-            #     for spelling in spellings:
-            #         spelling_idxs = [self.tokenizer_wrapper.token_to_id(token) for token in spelling]
-            #         if self.tokenizer_wrapper.unk_id in spelling_idxs:
-            #             print(f'tokenizer has unknown id for word[ {word} ] {spelling} {spelling_idxs}', flush=True)
-            #             continue
-            #         self.trie.insert(
-            #             spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
-            #         )
-            #     spelling_loop_time_list.append(time.time() - spelling_loop_time)
-
-            # Pre-process the word indices and scores in bulk
-            word_indices = np.array([self.word_dict.get_index(word) for word in self.lexicon.keys()])
-            start_states = np.repeat(start_state, len(word_indices))
-
-            # Compute scores for all words at once
-            scores = np.array([self.lm.score(state, idx)[1] for state, idx in zip(start_states, word_indices)])
-
-            # Get spellings and map them to token ids in one step
-            spelling_loop_time = time.time()
             for i, (word, spellings) in enumerate(self.lexicon.items()):
-                word_idx = word_indices[i]
-                score = scores[i]
-                
-                # Convert all spellings at once and check for unknown ids
-                spelling_idxs = [self.tokenizer_wrapper.token_to_id(token) for spelling in spellings for token in spelling]
-                spelling_idxs = np.array(spelling_idxs).reshape(len(spellings), -1)  # Reshape based on spelling length
-                
-                # Filter out spellings with unknown tokens
-                valid_spellings = spelling_idxs[~np.any(spelling_idxs == self.tokenizer_wrapper.unk_id, axis=1)]
-                
-                # Insert valid spellings into trie
-                scores_to_insert = np.where(word in boost_words, float(boost_words[word]), score)
-                for spelling in valid_spellings:
-                    self.trie.insert(spelling, word_idx, scores_to_insert)
+                word_idx = self.word_dict.get_index(word)
+                score_time = time.time()
+                _, score = self.lm.score(start_state, word_idx)
+                score_time_list.append(time.time() - score_time)
+                spelling_loop_time = time.time()
+                for spelling in spellings:
+                    spelling_idxs = [self.tokenizer_wrapper.token_to_id(token) for token in spelling]
+                    if self.tokenizer_wrapper.unk_id in spelling_idxs:
+                        print(f'tokenizer has unknown id for word[ {word} ] {spelling} {spelling_idxs}', flush=True)
+                        continue
+                    self.trie.insert(
+                        spelling_idxs, word_idx, score if word not in boost_words else float(boost_words[word])
+                    )
+                spelling_loop_time_list.append(time.time() - spelling_loop_time)
 
             print(f'Lexicon loop takes {time.time() - lexicon_loop_time - sum(spelling_loop_time_list)}')
             print(f'Score time takes {sum(score_time_list)}')
